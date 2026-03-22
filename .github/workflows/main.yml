@@ -50,8 +50,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-        run: |
-          git add .
-          git commit -m "Auto sync update"
-          git push origin main
