@@ -18,6 +18,9 @@ export interface ClaimData {
   garageName: string;
   estimatedAmount: number;
   paidAmount: number;
+  licensePlate: string;
+  checkCode: string;
+  validateCode: string;
 }
 
 export interface GarageRevenueReport {
@@ -56,5 +59,19 @@ export interface GDVReport {
   pendingUnder45: number;
   pendingOver45: number;
   over45Ratio: number;
+}
+
+export interface Over45Report {
+  stt: number;
+  gdvCode: string;
+  claimNumber: string;
+  licensePlate: string;
+  type: string;
+  garageName: string;
+  checkCode: string;
+  validateCode: string;
+  estimatedAmount: number;
+  status: string;
+  agingDays: number;
 }
 

@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
-import { ClaimData, GDVReport, ComprehensiveReport, GarageRevenueReport } from './types';
+import { ClaimData, GDVReport, ComprehensiveReport, GarageRevenueReport, Over45Report } from './types';
 import { 
   processExcelData, 
   generateGDVReport, 
   generateComprehensiveReport,
-  generateGarageRevenueReport
+  generateGarageRevenueReport,
+  generateOver45DaysReport
 } from './utils';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -36,7 +37,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState<string>('');
   const [filterGdv, setFilterGdv] = useState('');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'report1' | 'report4' | 'report5'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'report1' | 'report4' | 'report5' | 'report6'>('dashboard');
   const [notification, setNotification] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
   // Auto-hide notification
@@ -168,6 +169,7 @@ export default function App() {
   const gdvReport = useMemo(() => generateGDVReport(filteredData), [filteredData]);
   const comprehensiveReport = useMemo(() => generateComprehensiveReport(filteredData), [filteredData]);
   const garageRevenueReport = useMemo(() => generateGarageRevenueReport(filteredData), [filteredData]);
+  const over45Report = useMemo(() => generateOver45DaysReport(filteredData), [filteredData]);
 
   const stats = useMemo(() => {
     const total = filteredData.length;
@@ -235,6 +237,23 @@ export default function App() {
     }));
     const ws5 = XLSX.utils.json_to_sheet(ws5Data);
     XLSX.utils.book_append_sheet(wb, ws5, "Doanh thu Gara");
+
+    // Report 6: Over 45 Days
+    const ws6Data = over45Report.map((r) => ({
+      'Stt': r.stt,
+      'GĐV thụ lý': r.gdvCode,
+      'Số HSBT': r.claimNumber,
+      'Biển số xe': r.licensePlate,
+      'Mã nghiệp vụ': r.type,
+      'Tên garage': r.garageName,
+      'Mã check': r.checkCode,
+      'Mã validate': r.validateCode,
+      'Tiền ước/duyệt BT': r.estimatedAmount,
+      'Trạng thái hồ sơ': r.status,
+      'Số ngày tồn': r.agingDays
+    }));
+    const ws6 = XLSX.utils.json_to_sheet(ws6Data);
+    XLSX.utils.book_append_sheet(wb, ws6, "Tồn trên 45 ngày");
 
     XLSX.writeFile(wb, `Bao_cao_Ton_XCG_PTI_QN_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
@@ -352,6 +371,7 @@ export default function App() {
               <TabButton active={activeTab === 'report4'} onClick={() => setActiveTab('report4')} label="Báo cáo Tổng hợp" />
               <TabButton active={activeTab === 'report1'} onClick={() => setActiveTab('report1')} label="Báo cáo GĐV thụ lý" />
               <TabButton active={activeTab === 'report5'} onClick={() => setActiveTab('report5')} label="Doanh thu Gara" />
+              <TabButton active={activeTab === 'report6'} onClick={() => setActiveTab('report6')} label="Tồn trên 45 ngày" />
             </div>
 
             {/* Content */}
@@ -605,6 +625,55 @@ export default function App() {
                           </td>
                         </tr>
                       </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'report6' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-bold text-red-900 uppercase">Báo cáo tồn trên 45 ngày</h3>
+                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">
+                      {over45Report.length} hồ sơ
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
+                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-center">
+                        <tr>
+                          <th className="px-2 py-3 border border-slate-300">Stt</th>
+                          <th className="px-3 py-3 border border-slate-300">GĐV thụ lý</th>
+                          <th className="px-4 py-3 border border-slate-300">Số HSBT</th>
+                          <th className="px-3 py-3 border border-slate-300">Biển số xe</th>
+                          <th className="px-2 py-3 border border-slate-300">Mã nghiệp vụ</th>
+                          <th className="px-4 py-3 border border-slate-300 text-left">Tên garage</th>
+                          <th className="px-2 py-3 border border-slate-300">Mã check</th>
+                          <th className="px-2 py-3 border border-slate-300">Mã validate</th>
+                          <th className="px-3 py-3 border border-slate-300">Tiền ước/duyệt BT</th>
+                          <th className="px-3 py-3 border border-slate-300">Trạng thái hồ sơ</th>
+                          <th className="px-2 py-3 border border-slate-300">Số ngày tồn</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {over45Report.map((r) => (
+                          <tr key={r.claimNumber} className="hover:bg-red-50/30 transition-colors text-center">
+                            <td className="px-2 py-3 border border-slate-300">{r.stt}</td>
+                            <td className="px-3 py-3 border border-slate-300 font-bold">{r.gdvCode}</td>
+                            <td className="px-4 py-3 border border-slate-300 font-mono text-[10px]">{r.claimNumber}</td>
+                            <td className="px-3 py-3 border border-slate-300 font-semibold">{r.licensePlate}</td>
+                            <td className="px-2 py-3 border border-slate-300">{r.type}</td>
+                            <td className="px-4 py-3 border border-slate-300 text-left max-w-[200px] truncate">{r.garageName}</td>
+                            <td className="px-2 py-3 border border-slate-300">{r.checkCode}</td>
+                            <td className="px-2 py-3 border border-slate-300">{r.validateCode}</td>
+                            <td className="px-3 py-3 border border-slate-300 font-bold text-blue-600">
+                              {r.estimatedAmount.toLocaleString('vi-VN')}
+                            </td>
+                            <td className="px-3 py-3 border border-slate-300 italic text-slate-500">{r.status}</td>
+                            <td className="px-2 py-3 border border-slate-300 font-black text-red-600 bg-red-50">{r.agingDays}</td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 </div>

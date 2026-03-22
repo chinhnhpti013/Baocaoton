@@ -1,4 +1,4 @@
-import { ClaimData, GDVReport, ComprehensiveReport, GarageRevenueReport } from './types';
+import { ClaimData, GDVReport, ComprehensiveReport, GarageRevenueReport, Over45Report } from './types';
 
 const normalizeText = (text: string): string => {
   return text
@@ -23,7 +23,11 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
     avg2025: -1, // HSPS TB 2025
     garage: -1,
     estimated: -1,
-    paid: -1
+    paid: -1,
+    licensePlate: -1,
+    checkCode: -1,
+    validateCode: -1,
+    status: -1
   };
 
   for (let i = 0; i < Math.min(rawRows.length, 50); i++) { // Scan up to 50 rows
@@ -39,8 +43,28 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
     const typeIdx = rowStr.findIndex(c => c.includes('ma nghiep vu') || c.includes('nghiep vu') || c.includes('loai hinh'));
     const avgIdx = rowStr.findIndex(c => c.includes('hsps tb') || c.includes('trung binh 2025'));
     const garageIdx = rowStr.findIndex(c => c.includes('ten garage') || c.includes('ten gara') || c.includes('garage') || c.includes('showroom'));
-    const estimatedIdx = rowStr.findIndex(c => c.includes('tien sua chua') || c.includes('tien uoc') || c.includes('duyet bt') || c.includes('uoc bt'));
-    const paidIdx = rowStr.findIndex(c => c.includes('tien bt da tra cho gr') || c.includes('tien bt da tra') || c.includes('da tra cho gr') || c.includes('da tra'));
+    const estimatedIdx = rowStr.findIndex(c => c.includes('tien uoc/duyet bt')) !== -1 
+      ? rowStr.findIndex(c => c.includes('tien uoc/duyet bt'))
+      : rowStr.findIndex(c => c.includes('tien sua chua') || c.includes('tien uoc') || c.includes('duyet bt') || c.includes('uoc bt'));
+    
+    const paidIdx = rowStr.findIndex(c => c.includes('tien bt da tra cho gr')) !== -1
+      ? rowStr.findIndex(c => c.includes('tien bt da tra cho gr'))
+      : rowStr.findIndex(c => c.includes('tien bt da tra') || c.includes('da tra cho gr') || c.includes('da tra'));
+    const plateIdx = rowStr.findIndex(c => c === 'bien so xe' || c === 'bien so') !== -1
+      ? rowStr.findIndex(c => c === 'bien so xe' || c === 'bien so')
+      : rowStr.findIndex(c => c.includes('bien so xe') || c.includes('bien so'));
+
+    const checkIdx = rowStr.findIndex(c => c === 'ma check' || c === 'check code') !== -1 
+      ? rowStr.findIndex(c => c === 'ma check' || c === 'check code')
+      : rowStr.findIndex(c => c.includes('ma check') || c.includes('check code'));
+    
+    const validateIdx = rowStr.findIndex(c => c === 'ma validate' || c === 'validate code') !== -1
+      ? rowStr.findIndex(c => c === 'ma validate' || c === 'validate code')
+      : rowStr.findIndex(c => c.includes('ma validate') || c.includes('validate code'));
+
+    const statusIdx = rowStr.findIndex(c => c === 'trang thai ho so' || c === 'trang thai') !== -1
+      ? rowStr.findIndex(c => c === 'trang thai ho so' || c === 'trang thai')
+      : rowStr.findIndex(c => c.includes('trang thai ho so') || c.includes('trang thai'));
 
     if (gdvIdx !== -1 || hsbtIdx !== -1 || agingIdx !== -1) {
       headerIndex = i;
@@ -53,7 +77,11 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
         avg2025: avgIdx,
         garage: garageIdx,
         estimated: estimatedIdx,
-        paid: paidIdx
+        paid: paidIdx,
+        licensePlate: plateIdx,
+        checkCode: checkIdx,
+        validateCode: validateIdx,
+        status: statusIdx
       };
       break;
     }
@@ -62,7 +90,7 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
   if (headerIndex === -1) return [];
 
   const dataRows = rawRows.slice(headerIndex + 1);
-  const startDate2026 = new Date('2026-01-01T00:00:00');
+  const startDate2026 = new Date(2026, 0, 1);
   
   // We don't filter by 2026 here because we need 2025 carryover for the comprehensive report
   return dataRows
@@ -79,9 +107,13 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
       const garageName = colIndices.garage !== -1 ? String(row[colIndices.garage] || '-').trim() : '-';
       const estimatedAmount = colIndices.estimated !== -1 ? parseAmount(row[colIndices.estimated]) : 0;
       const paidAmount = colIndices.paid !== -1 ? parseAmount(row[colIndices.paid]) : 0;
+      const licensePlate = colIndices.licensePlate !== -1 ? String(row[colIndices.licensePlate] || '-').trim() : '-';
+      const checkCode = colIndices.checkCode !== -1 ? String(row[colIndices.checkCode] || '-').trim() : '-';
+      const validateCode = colIndices.validateCode !== -1 ? String(row[colIndices.validateCode] || '-').trim() : '-';
+      const excelStatus = colIndices.status !== -1 ? String(row[colIndices.status] || '').trim() : '';
       
       // Date handling
-      let receivedDate = new Date();
+      let receivedDate = new Date(1900, 0, 1);
       if (colIndices.receivedDate !== -1 && row[colIndices.receivedDate]) {
         receivedDate = parseExcelDate(row[colIndices.receivedDate]);
       }
@@ -95,7 +127,7 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
         gdvCode,
         claimNumber,
         receivedDate,
-        status: isResolved ? 'Đã giải quyết' : 'Đang giải quyết',
+        status: excelStatus || (isResolved ? 'Đã giải quyết' : 'Đang giải quyết'),
         type,
         agingDays,
         isResolved,
@@ -103,7 +135,10 @@ export const processExcelData = (rawRows: any[][]): ClaimData[] => {
         isOver45,
         garageName,
         estimatedAmount,
-        paidAmount
+        paidAmount,
+        licensePlate,
+        checkCode,
+        validateCode
       };
     });
 };
@@ -114,8 +149,21 @@ const parseExcelDate = (val: any): Date => {
     // Excel serial date
     return new Date((val - 25569) * 86400 * 1000);
   }
+  if (typeof val === 'string') {
+    const str = val.trim();
+    // Handle DD/MM/YYYY
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+  }
   const d = new Date(val);
-  return isNaN(d.getTime()) ? new Date() : d;
+  return isNaN(d.getTime()) ? new Date(1900, 0, 1) : d;
 };
 
 const parseAmount = (val: any): number => {
@@ -141,9 +189,11 @@ const parseAmount = (val: any): number => {
 
 export const generateGDVReport = (data: ClaimData[]): GDVReport[] => {
   const gdvMap = new Map<string, GDVReport>();
-  const currentYear = 2026;
 
-  data.filter(item => item.receivedDate.getFullYear() === currentYear).forEach(item => {
+  data.filter(item => {
+    const year = item.receivedDate.getFullYear();
+    return year === 2025 || year === 2026;
+  }).forEach(item => {
     if (!gdvMap.has(item.gdvCode)) {
       gdvMap.set(item.gdvCode, {
         gdvCode: item.gdvCode,
@@ -288,7 +338,7 @@ export const generateComprehensiveReport = (data: ClaimData[]): ComprehensiveRep
 
 export const generateGarageRevenueReport = (data: ClaimData[]): GarageRevenueReport[] => {
   const garageMap = new Map<string, GarageRevenueReport>();
-  const startDate2026 = new Date('2026-01-01T00:00:00');
+  const startDate2026 = new Date(2026, 0, 1);
 
   // Filter: Ngày mở HSBT >= 01/01/2026
   data.filter(item => item.receivedDate >= startDate2026).forEach(item => {
@@ -306,7 +356,7 @@ export const generateGarageRevenueReport = (data: ClaimData[]): GarageRevenueRep
     const report = garageMap.get(name)!;
     // Số vụ phát sinh trong năm 2026 = Count Số HSBT
     report.claimCount++;
-    // Số tiền sc PS 2026 ước BT = SUM Tiền sửa chữa
+    // Số tiền sc PS 2026 ước BT = SUM Tiền ước/duyệt BT
     report.totalEstimated += item.estimatedAmount;
     // ST sửa chữa PS 2026 đã BT = SUM Tiền BT đã trả cho GR
     report.totalPaid += item.paidAmount;
@@ -316,4 +366,23 @@ export const generateGarageRevenueReport = (data: ClaimData[]): GarageRevenueRep
   return Array.from(garageMap.values())
     .sort((a, b) => b.totalEstimated - a.totalEstimated)
     .slice(0, 10);
+};
+
+export const generateOver45DaysReport = (data: ClaimData[]): Over45Report[] => {
+  return data
+    .filter(item => item.agingDays > 45)
+    .sort((a, b) => b.agingDays - a.agingDays)
+    .map((item, index) => ({
+      stt: index + 1,
+      gdvCode: item.gdvCode,
+      claimNumber: item.claimNumber,
+      licensePlate: item.licensePlate,
+      type: item.type,
+      garageName: item.garageName,
+      checkCode: item.checkCode,
+      validateCode: item.validateCode,
+      estimatedAmount: item.estimatedAmount,
+      status: item.status,
+      agingDays: item.agingDays
+    }));
 };
