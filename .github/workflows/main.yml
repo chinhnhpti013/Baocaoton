@@ -1,0 +1,29 @@
+name: Sync from AI Studio
+
+on:
+  push:
+    branches:
+      - main   # Theo dõi các thay đổi trên nhánh chính
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Git
+        run: |
+          git config --global user.email "chinhnh.pti@gmail.com"
+          git config --global user.name "chinhnhpti013"
+
+      - name: Pull latest code from AI Studio
+        run: |
+          # Lệnh pull hoặc sync từ GitHub repo của bạn (sử dụng URL của repo AI Studio)
+          git pull https://github.com/chinhnhpti013/Baocaoton.git main
+
+      - name: Push changes to GitHub
+        run: |
+          git add .
+          git commit -m "Auto sync update"
+          git push origin main
